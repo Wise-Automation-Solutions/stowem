@@ -21,7 +21,11 @@ const stowem = new Stowem({ apiKey: process.env.STOWEM_API_KEY, routes });
 const result = await stowem.plan({ inputs, schema, saved_state, path_params });
 if (result.status === 'plan') {
   for (const req of stowem.resolve(result)) {
-    await fetch(yourBackend + req.url, { method: req.method, body: JSON.stringify(req.body) });
+    await fetch(yourBackend + req.url, {
+      method: req.method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body),
+    });
   }
 }
 ```

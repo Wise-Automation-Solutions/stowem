@@ -37,6 +37,7 @@ npm install @stowem/sdk
 ```
 
 ```js
+import { randomUUID } from 'node:crypto';
 import { Stowem } from '@stowem/sdk';
 
 const stowem = new Stowem({
@@ -62,11 +63,12 @@ const result = await stowem.plan({
   schema,
   saved_state: { patient: currentRecord },
   path_params: { patient_id: 'patient:789' },
-  idempotency_key: crypto.randomUUID(),
+  idempotency_key: randomUUID(),
 });
 
 if (result.status === 'plan') {
   for (const req of stowem.resolve(result)) {
+    // req.url is a path ("/api/patients/patient:789"): put your backend's origin in front.
     await fetch(yourBackend + req.url, {
       method: req.method,
       headers: { Authorization: `Bearer ${yourOwnToken}`, 'Content-Type': 'application/json' },
@@ -76,7 +78,7 @@ if (result.status === 'plan') {
 }
 ```
 
-The rest of this page explains each piece.
+The rest of this page explains each piece. You need `@stowem/sdk` **0.1.1 or later** for the types to match this page.
 
 ---
 
@@ -107,7 +109,10 @@ The rest of this page explains each piece.
   form, a PDF's text.
 - **`tabular`** — CSV or TSV. Headers need not match your field names
   ("DOB" finds `date_of_birth`). Rows bound for the same route arrive as
-  one operation carrying many items, not one operation per row.
+  one operation carrying many items, not one operation per row. When a row
+  becomes an item of a `string[]` field, **its format comes from the field's
+  description**: "Previous visits, one item each, formatted
+  'YYYY-MM-DD: reason (vet)'" turns a three-column row into that string.
 
 Stowem receives **text only**. Extracting text from files is your side:
 `pdf-parse` for PDFs, `xlsx` for spreadsheets (export as CSV), an OCR
@@ -142,14 +147,18 @@ nest the placeholder in your body template instead.
 | `"string"` | text | |
 | `"string[]"` | a list of text | Always changed with `add_to_array`, never `set`. |
 | `"boolean"` | true / false | |
-| `"number"` | integer or decimal | |
+| `"number"` | integer or decimal | Say the unit in the description, and how to convert ("in kilograms; convert pounds at 1 lb = 0.4536 kg"). A value that is not a number is dropped and reported as `type_mismatch`. |
 | `"string"` + `"format": "iso-date"` | a date, `YYYY-MM-DD` | "12 April 1978" → `1978-04-12`; a bare year → 1 January of it (see rule 5). |
 | `"string"` + `"format": "iana-tz"` | a time zone | "Toronto" → `America/Toronto`. |
-| `"string"` + `"enum": [...]` | one of your options | Matched ignoring case, spacing and punctuation. A value that fits none is **dropped and reported** in `extraction.unusable_values`, never snapped to the nearest option. |
+| `"string"` + `"enum": [...]` | one of your options | The answer is **classified** into the option that covers it — "a Labrador" is `dog`, and a synonym your description teaches ("DHPP is the distemper/parvo shot") counts. An answer no option covers is **dropped and reported** in `extraction.unusable_values`, never swapped for the nearest-sounding option. |
 | `"string[]"` + `"enum": [...]` | several of your options | Judged item by item: off-list items are reported, the rest are kept. |
 
 If "none of these" is a real answer in your domain, put it in your option
 list. Two options that differ only in case or punctuation are refused.
+
+**Descriptions do the steering** for every type: the format of a list item,
+the unit of a number, which synonyms mean which option, how to read a
+2-digit year. Put the rule where the model will read it.
 
 ### Routes: your endpoints, declared once
 
@@ -175,6 +184,8 @@ update_patient_fields: {
 - `{patient_id}` in the path is filled at `resolve()` time from the
   `path_params` you passed to `plan()`. Those values never leave your
   server either.
+- **`resolve()` returns paths, not full URLs.** `req.url` is
+  `/api/patients/patient:789`; prefix your backend's origin when you send it.
 
 **The three verbs**
 
@@ -191,9 +202,11 @@ appear on several routes under *different* verbs, but a
 otherwise the request is refused with `400 route_invalid`.
 
 **Many items, one request or many.** By default, list items bound for the
-same route arrive in one request (`{ "items": [...] }`). If your endpoint
-takes one item per call, add `body_style: 'one-per-item'` and `resolve()`
-returns one request per item.
+same route arrive in one request, as an array wherever your placeholder is
+(`{ "vaccines": ["DHPP", "rabies"] }` for `{ vaccines: '<add_to_array.vaccinations>' }`).
+If your endpoint takes one item per call, add `body_style: 'one-per-item'`:
+`resolve()` returns one request per item, and the placeholder is filled with
+**the item itself**, not a one-element array (`{ "summary": "2025-03-14: Ear infection" }`).
 
 ### `saved_state`
 
@@ -202,8 +215,12 @@ returns one request per item.
 ```
 
 Build it from your own database, with only the fields relevant to this
-call. Values that match it are not sent back; values that differ come back
-as changes, and are listed in `changes_to_saved`. Stowem does not decide
+call — **keyed by resource**, exactly like the schema:
+`{ "patient": { ... } }`, not the bare record. Values that match it are not
+sent back; values that differ come back as changes, and are listed in
+`changes_to_saved`. **Include list fields too:** items already on file are
+filtered out one by one (ignoring case and surrounding spaces), so a
+vaccine you have recorded is not added again. Stowem does not decide
 "create" versus "update" — which route a change lands on (a POST route or a
 PATCH route) says that.
 
@@ -222,6 +239,10 @@ their default order after the ones you list.
 Generate a fresh one per save attempt — `crypto.randomUUID()` — and reuse
 it only when retrying *that* attempt. A retry with the same key and the
 same body returns the stored response, charged once. Stored for 24 hours.
+A replay is **identical** to the original, receipt included — so its
+`balance_micro_usd` is the balance as it was then, and nothing marks it as a
+replay. A *failed* attempt hands its key back: retrying a `504` runs again,
+and is charged again.
 **Never** use a user, session or conversation id: the second save from the
 same user will come back `409 idempotency_conflict`.
 
@@ -235,7 +256,14 @@ for the same field:
 1. **Exchange beats document beats tabular** (or your `precedence_order`).
 2. **Later beats earlier** within the same input type — a user correcting
    themselves wins.
-3. **Every disagreement is reported** in `conflicts`, whichever value won.
+3. **Every disagreement between answers is reported** in `conflicts`,
+   whichever value won. One exception: **inside a single input, only the
+   latest thing said about a field is kept**, so "about 30 pounds —
+   actually 13.2 kg" arrives as 13.2 kg with no conflict — whether it is
+   one message or two turns of the same conversation. A difference
+   *between* inputs (a chat and a form, or two separate `exchange`
+   inputs) is always reported. If you need every change of mind flagged,
+   send each stretch of conversation as its own `exchange` input.
 4. **Clearing a field is an answer like any other.** "Take my insurance
    off" in the chat beats an old form naming a carrier; "actually it's
    Aetna now" later beats the clear.
@@ -279,7 +307,11 @@ A `200` has one of two statuses.
 
 **`operations`** — each has a `route_id` (always one you declared), its
 `changes` (only verbs and fields that route accepts — guaranteed), and a
-`confidence` from 0 to 1.
+`confidence` from 0 to 1. **Confidence is per operation:** for `set`, several
+fields share one operation and its confidence is the **lowest** of them;
+list items are grouped so that items of different confidence travel in
+separate operations. There is no universal threshold — start by confirming
+with the user below 0.90 on anything destructive (`unset`) or hard to undo.
 
 **`conflicts`** — one entry per field where sources disagreed. The plan
 already uses `resolved_value`; this is for you to decide whether to ask the
@@ -296,7 +328,8 @@ user.
 
 **`changes_to_saved`** — fields whose new value simply differs from
 `saved_state` with no disagreement between sources: an ordinary update,
-listed for audit. Do not prompt on these by default.
+listed for audit. Do not prompt on these by default. Each item:
+`{ "schema_resource", "field", "saved_value", "new_value", "source" }`.
 
 **`extraction`** — what happened on the way, for spotting silent losses:
 
@@ -307,6 +340,12 @@ listed for audit. Do not prompt on these by default.
 | `dropped_changes` | `(resource, field, verb)` we read but no route accepts. | **Your routes are wrong.** Most often: `set` declared on a `string[]` field, which only ever gets `add_to_array`. |
 | `unusable_values` | Values that did not fit your field: `enum_no_match` or `type_mismatch`, with the value. | Usually your `enum` is missing a real answer. |
 | `overridden_unsets` | Fields someone asked to clear, where a value won instead. | Worth a look: clearing was the destructive intent. |
+
+Item shapes: `dropped_changes` and `overridden_unsets` are
+`{ "schema_resource", "field" }` (plus `"verb"` for `dropped_changes`);
+`unusable_values` is `{ "schema_resource", "field", "value", "reason" }`,
+where `value` is the answer **as we read it** — it may be normalised
+("the Lyme vaccine" → "Lyme vaccine"), not quoted verbatim.
 
 **`usage`** — the itemized bill for this call. All money is an integer in
 **micro-USD** (millionths of a dollar): `5889` is `$0.005889`.
@@ -341,6 +380,20 @@ and edge runtimes. MIT licensed.
 | `stowem.resolve(result)` | Turns a `plan` into `{ url, method, body }[]`. Local and deterministic: no network, same plan, same requests. Throws `StowemResolveError` before building any URL if something is wrong. |
 | `stowem.declaredRoutes(schema)` | The exact `routes` array that will be sent. |
 | `fillTemplate(template, changes)` from `@stowem/sdk/template` | Just the template filler, if you want nothing else. |
+| `plan(request, options)`, `resolve(operations, pathParams, routes)`, `declareRoutes(routes, schema)` | The same functions without the `Stowem` class, if you prefer to hold config yourself. |
+
+**Resolving a plan later** (say, after the user confirms a conflict):
+`stowem.resolve(result)` reads the `path_params` from the result object —
+`plan()` attaches them as `result.pathParams`. If you store the plan and
+rebuild it from the wire JSON, that property is gone and `resolve()` throws
+`missing_path_param`; keep it with the plan, or call the standalone
+`resolve(result.operations, pathParams, routes)`.
+
+**`pathParams` on a route** (not to be confused with `path_params`) maps a
+URL placeholder to a differently named key, for when one id fills
+differently named placeholders across routes:
+`pathParams: { owner: 'pet_owner_id' }` fills `{owner}` from
+`path_params.pet_owner_id`. Usually you do not need it.
 
 **`StowemAPIError`** has `status` (HTTP) and `envelope` (`{ error, message, field_path? }`).
 
@@ -399,8 +452,10 @@ Prepaid credit in dollars; no free tier, no invoices.
 **Stowem tokens = `ceil(characters / 4)`**, counted over the request body
 you sent and the response body (excluding `usage`). Your schema and route
 declarations count, because they are read on every call. Billed output is
-capped at `min(16 000, 2 000 + 2 × input_tokens)`. Our choice of models,
-retries and prompts never changes your bill.
+capped at `min(16 000, 2 000 + 2 × input_tokens)`. Each line is
+`ceil(tokens × rate / 1 000 000)` in micro-USD — rounded up once per line,
+so 215 output tokens is 1 613, not 1 612.5. Our choice of models, retries and
+prompts never changes your bill.
 
 A short exchange costs about **$0.003**, half of it the base fee — so how
 *often* you call moves your bill more than how much you send. Every

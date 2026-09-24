@@ -11,6 +11,6 @@
     "start": "node index.mjs"
   },
   "dependencies": {
-    "@stowem/sdk": "^0.1.0"
+    "@stowem/sdk": "^0.1.1"
   }
 }

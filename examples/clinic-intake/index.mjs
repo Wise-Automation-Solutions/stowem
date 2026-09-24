@@ -1,9 +1,9 @@
 // Clinic intake: a chat plus a scanned paper form, turned into the exact
-// requests your backend needs. Walks through the PRD's full example against
-// the live API.
+// requests your backend needs, against the live API.
 //
 //   STOWEM_API_KEY=sk_stowem_... npm start
 
+import { randomUUID } from 'node:crypto';
 import { Stowem, StowemAPIError } from '@stowem/sdk';
 import { startBackend } from './backend.mjs';
 
@@ -107,6 +107,9 @@ try {
     saved_state: { patient: { name: 'John Smith' } },
     // Real ids stay here: resolve() fills the {patient_id} placeholder locally.
     path_params: { patient_id: 'patient:789' },
+    // One per save attempt. Retrying this attempt with the same key returns
+    // the stored answer, charged once; never use a user or session id.
+    idempotency_key: randomUUID(),
   });
 
   console.log(`\nStowem answered: ${result.status}`);
