@@ -41,6 +41,11 @@ The SDK source ships in the npm package,
 [`@stowem/sdk`](https://www.npmjs.com/package/@stowem/sdk). The API itself
 is a hosted service at `https://stowem.wiseautomation.solutions`.
 
+**Account questions** — top-ups, keys, limits: [support@wiseautomation.solutions](mailto:support@wiseautomation.solutions).
+**Bugs and doc questions:** [open an issue](https://github.com/Wise-Automation-Solutions/stowem/issues).
+The docs will also be published at `wiseautomation.solutions/stowem/docs`
+once the site is live.
+
 ## License
 
 The examples and docs here are MIT licensed, like the SDK. See

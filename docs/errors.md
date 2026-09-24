@@ -18,7 +18,7 @@ inputs costs nothing. The two exceptions are marked below.
 | Status | What to do |
 |---|---|
 | `400` | Fix the request. Retrying it unchanged will fail the same way. |
-| `401`, `403` | Fix the key, or talk to us. |
+| `401`, `403` | Fix the key, or write to [support@wiseautomation.solutions](mailto:support@wiseautomation.solutions). |
 | `402` | Top up, or raise your own spend cap. |
 | `404` | Wrong URL or method. The API is `POST /v1/plans`. |
 | `409` | Your idempotency key: either reused wrongly, or the first request is still running. |
@@ -49,7 +49,7 @@ points at what to fix.
 | Status | `error` | Cause | Fix |
 |---|---|---|---|
 | 401 | `unauthorized` | No `Authorization: Bearer ...` header, or a key we do not recognise (wrong, revoked or rotated). | Check the header and the key. Rotating a key invalidates the old one immediately. |
-| 403 | `account_suspended` | The key is valid, but its account is suspended. | Contact us. A new key will not help — the account is the problem, not the key. |
+| 403 | `account_suspended` | The key is valid, but its account is suspended. | Write to [support@wiseautomation.solutions](mailto:support@wiseautomation.solutions). A new key will not help — the account is the problem, not the key. |
 
 ## 402 — money
 
@@ -90,7 +90,7 @@ Free.
 
 | `error` | Cause | Fix |
 |---|---|---|
-| `rate_limited` | Over one of your **account's** limits — 120 requests a minute, 50 000 a day, or 10 in flight at once — or over the per-IP limit at our edge (20 a second, bursts of 40, 30 open at once). | Wait the `Retry-After` header's seconds, then retry. For the minute and day limits it is the time until the window rolls over; for the in-flight limit it is a short estimate. The account limits are raisable — ask us. More keys do not help: limits belong to the account. |
+| `rate_limited` | Over one of your **account's** limits — 120 requests a minute, 50 000 a day, or 10 in flight at once — or over the per-IP limit at our edge (20 a second, bursts of 40, 30 open at once). | Wait the `Retry-After` header's seconds, then retry. For the minute and day limits it is the time until the window rolls over; for the in-flight limit it is a short estimate. The account limits are raisable — write to [support@wiseautomation.solutions](mailto:support@wiseautomation.solutions) and say what you are building. More keys do not help: limits belong to the account. |
 
 ## 500, 503, 504 — our side
 
@@ -105,7 +105,7 @@ already finished: then the retry returns the stored result, charged once.
 |---|---|---|---|---|
 | 503 | `service_paused` | We have paused serving, our AI provider is unreachable, or the API is restarting for a deploy (a few seconds). Nothing to do with your key, limits or balance. | **Free** | Wait `Retry-After` seconds and retry. |
 | 504 | `timeout` | Extraction did not finish within 60 seconds. Most likely on very large inputs — a 64 KB list-shaped document can take 25–45 s. | **Input + base fee** | Retry with the same key. If it keeps happening, split the input. |
-| 500 | `internal_error` | A fault on our side. | **Input + base fee** if a model had already started; otherwise free | Retry with the same key. If it persists, tell us the `x-stowem-request-id` response header. |
+| 500 | `internal_error` | A fault on our side. | **Input + base fee** if a model had already started; otherwise free | Retry with the same key. If it persists, send the `x-stowem-request-id` response header to [support@wiseautomation.solutions](mailto:support@wiseautomation.solutions). |
 
 ---
 
@@ -158,7 +158,7 @@ no charge. It has a `code`:
 |---|---|---|
 | `unknown_route` | The plan names a `route_id` you have not configured. | Configure every route you send. With the SDK's derived routes this only happens if you pass `routes` by hand. |
 | `mixed_verbs` | A body template mixes `<set.*>` and `<add_to_array.*>`. | One verb per route: split it in two. |
-| `duplicate_set` | Two operations set the same field on the same route. | Should not happen; report it to us with the plan. |
+| `duplicate_set` | Two operations set the same field on the same route. | Should not happen; send the plan to [support@wiseautomation.solutions](mailto:support@wiseautomation.solutions). |
 | `unsafe_reference` | A `path_params` value contains `/`, `..`, `?` or `#`. | Pass an id, not a path fragment. |
 | `missing_path_param` | A `{placeholder}` in a route's path has no value in `path_params`. | Pass it to `plan()`. |
 | `invalid_route_config` | The route cannot be used as written: its `schema_resource` is not in the schema; `<unset.field>` sits inside an array (use `<unset>`); or `body_style: 'one-per-item'` with more than one list field. | Fix the route config. |

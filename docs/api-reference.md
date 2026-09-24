@@ -487,6 +487,22 @@ it is refused with `402` before any model runs.
 
 Over a rate limit you get `429 rate_limited` with `Retry-After`, at no cost.
 
+## Your account
+
+The account dashboard — balance, activity, top-ups, keys — is coming to
+[wiseautomation.solutions](https://wiseautomation.solutions). Until then:
+
+- **Your balance** is in every successful response: `usage.balance_micro_usd`.
+  A call with empty `inputs` is free and returns it too.
+- **Top-ups, a new or rotated key, higher limits, a spend cap, or anything
+  about your account:** write to [support@wiseautomation.solutions](mailto:support@wiseautomation.solutions). Rotating a key invalidates the old
+  one immediately.
+- **A bug, or a question about these docs:** open an issue on
+  [github.com/Wise-Automation-Solutions/stowem](https://github.com/Wise-Automation-Solutions/stowem/issues).
+
+These docs will move to `wiseautomation.solutions/stowem/docs` when the site
+is live; the text stays the same.
+
 ## What Stowem keeps
 
 Nothing of your content: not your inputs, not the extracted values, not
