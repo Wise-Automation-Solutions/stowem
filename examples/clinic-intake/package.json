@@ -1,0 +1,16 @@
+{
+  "name": "stowem-example-clinic-intake",
+  "private": true,
+  "description": "A clinic intake chat plus a scanned form, turned into requests for your own backend with @stowem/sdk.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node index.mjs"
+  },
+  "dependencies": {
+    "@stowem/sdk": "^0.1.0"
+  }
+}
