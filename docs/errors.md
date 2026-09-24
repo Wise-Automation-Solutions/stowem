@@ -94,8 +94,12 @@ Free.
 
 ## 500, 503, 504 — our side
 
-Retry these **with the same `idempotency_key`**. If the first attempt
-actually finished, you get its result and are not charged twice.
+Retry these **with the same `idempotency_key`**. A failed attempt hands
+its key back, so the retry runs afresh. **That means a charged failure is
+charged again on retry:** a `504`, or a `500` after a model had started,
+costs input + base fee each time. The key's protection is for the case
+where you *did not see* the answer — a dropped connection after we had
+already finished: then the retry returns the stored result, charged once.
 
 | Status | `error` | Cause | Charged? | Fix |
 |---|---|---|---|---|
@@ -140,8 +144,10 @@ These arrive as the underlying `fetch` error, **not** as `StowemAPIError`:
   `AbortError` carrying your reason.
 
 After a network failure or timeout you cannot know whether the request ran.
-Retry with the **same** `idempotency_key`: if it did run, you get its result
-and pay once.
+Retry with the **same** `idempotency_key`: if it finished, you get its
+stored result and pay once; if it is still running you get
+`409 idempotency_in_progress` (wait and retry again); if it failed, the
+retry runs afresh.
 
 ### `StowemResolveError` — your route config, caught locally
 
