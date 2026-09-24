@@ -4,7 +4,7 @@ Everything you need while writing the integration, on one page. For a
 runnable walkthrough, start with [`examples/clinic-intake`](../examples/clinic-intake);
 for every error code and what to do about it, see [errors.md](errors.md).
 
-**API version:** v20 of the spec, served at `/v1`.
+**API version:** v21 of the spec, served at `/v1`.
 
 ## How it works
 
