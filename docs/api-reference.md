@@ -4,7 +4,7 @@ Everything you need while writing the integration, on one page. For a
 runnable walkthrough, start with [`examples/clinic-intake`](../examples/clinic-intake);
 for every error code and what to do about it, see [errors.md](errors.md).
 
-**API version:** v21 of the spec, served at `/v1`.
+**API version:** v22 of the spec, served at `/v1`.
 
 ## How it works
 
@@ -148,7 +148,7 @@ nest the placeholder in your body template instead.
 | `"string[]"` | a list of text | Always changed with `add_to_array`, never `set`. |
 | `"boolean"` | true / false | |
 | `"number"` | integer or decimal | Say the unit in the description, and how to convert ("in kilograms; convert pounds at 1 lb = 0.4536 kg"). A value that is not a number is dropped and reported as `type_mismatch`. |
-| `"string"` + `"format": "iso-date"` | a date, `YYYY-MM-DD` | "12 April 1978" → `1978-04-12`; a bare year → 1 January of it (see rule 5). |
+| `"string"` + `"format": "iso-date"` | a date, `YYYY-MM-DD` | "12 April 1978" → `1978-04-12`. A date given only as a year or a month arrives as the first of it ("March 1978" → `1978-03-01`); Stowem remembers it was partial (see rule 5). |
 | `"string"` + `"format": "iana-tz"` | a time zone | "Toronto" → `America/Toronto`. |
 | `"string"` + `"enum": [...]` | one of your options | The answer is **classified** into the option that covers it — "a Labrador" is `dog`, and a synonym your description teaches ("DHPP is the distemper/parvo shot") counts. An answer no option covers is **dropped and reported** in `extraction.unusable_values`, never swapped for the nearest-sounding option. |
 | `"string[]"` + `"enum": [...]` | several of your options | Judged item by item: off-list items are reported, the rest are kept. |
@@ -267,11 +267,12 @@ for the same field:
 4. **Clearing a field is an answer like any other.** "Take my insurance
    off" in the chat beats an old form naming a carrier; "actually it's
    Aetna now" later beats the clear.
-5. **A full date beats a bare year in the same year.** "78" in the chat
-   and "12 April 1978" on a form gives 1978-04-12, whatever the order, with
-   reason `specificity`. **Known limitation:** a real 1 January is stored
-   like a bare year and loses the same way — the conflict is still
-   reported, so you can confirm with the user.
+5. **A more precise date beats a less precise one it agrees with.** "78"
+   in the chat and "12 April 1978" on a form gives 1978-04-12, whatever the
+   order, with reason `specificity`; so does "March 1978" against
+   "14 March 1978". A real "1 January 1978" is a full date, so it keeps its
+   normal precedence. A date that contradicts the other ("March" against
+   "14 April") is an ordinary disagreement, settled by rules 1 and 2.
 
 ---
 
@@ -324,7 +325,7 @@ user.
 | `saved_value` | What `saved_state` held, if anything. |
 | `resolved_value` | What the plan uses. `null` means the plan clears the field. |
 | `source` | Where the winning value came from. |
-| `reason` | `precedence` (source order), `recency` (later answer in the same type), or `specificity` (a full date beat a bare year). |
+| `reason` | `precedence` (source order), `recency` (later answer in the same type), or `specificity` (a more precise date beat a less precise one it agrees with). |
 
 **`changes_to_saved`** — fields whose new value simply differs from
 `saved_state` with no disagreement between sources: an ordinary update,
