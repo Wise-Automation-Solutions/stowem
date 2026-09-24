@@ -32,7 +32,7 @@ Stowem answered: plan
     set insurance_provider = "Blue Cross"
   add_patient_medication (confidence 0.99)
     add_to_array medications = ["Ibuprofen 400mg daily"]
-  conflict on date_of_birth: kept "1978-04-12" from document (precedence)
+  conflict on date_of_birth: kept "1978-04-12" from document (specificity)
   cost $0.003574, balance left $9.98
 
 Your backend received:
@@ -69,9 +69,11 @@ requests do not.
 ## The conflict line
 
 The patient said "78" in the chat — a year, nothing more — and the form
-says 12 April 1978. Stowem kept the form's date and **flagged the
-disagreement** rather than silently choosing. Every conflict comes back in
-`conflicts` with both values, so you can decide whether to ask the patient.
+says 12 April 1978. Normally a chat answer beats a form, but a bare year
+loses to a full date from the same year, so Stowem kept the form's date:
+`specificity` is the reason it gives. It also **flagged the disagreement**
+rather than silently choosing. Every conflict comes back in `conflicts`
+with both values, so you can decide whether to ask the patient.
 
 ## Making it yours
 
