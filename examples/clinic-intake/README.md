@@ -87,6 +87,6 @@ with both values, so you can decide whether to ask the patient.
 
 ## Next
 
-- The API reference: `docs/api-reference.md` in this repository
-- Every error code and what to do about it: `docs/errors.md`
+- The API reference: [docs/api-reference.md](../../docs/api-reference.md)
+- Every error code and what to do about it: [docs/errors.md](../../docs/errors.md)
 - The SDK on npm: [`@stowem/sdk`](https://www.npmjs.com/package/@stowem/sdk)
